@@ -73,20 +73,21 @@ export async function POST(request: NextRequest) {
             const roomsUrl = `${restApiHost}/${orgName}/${appName}/chatrooms`;
 
             try {
-                // First, list rooms to see if it exists
-                // Note: Agora API for listing might be paginated, for now we list a batch
-                const listRes = await fetch(`${roomsUrl}?limit=100`, {
+                // List rooms to see if it exists - increase limit to find older rooms
+                const listRes = await fetch(`${roomsUrl}?limit=500`, {
                     headers: { 'Authorization': `Bearer ${appToken}` }
                 });
                 const listData = await listRes.json();
 
+                // Find the existing room by name (channelName)
+                // We pick the earliest one if multiple exist for consistency
                 const existingRoom = listData.data?.find((r: any) => r.name === channelName);
 
                 if (existingRoom) {
                     roomId = existingRoom.id;
                     console.log('Found existing room:', roomId, 'for channel:', channelName);
                 } else {
-                    // Create new room
+                    // Create new room if none found
                     console.log('Creating new chat room for channel:', channelName);
                     const createRes = await fetch(roomsUrl, {
                         method: 'POST',
@@ -96,8 +97,8 @@ export async function POST(request: NextRequest) {
                         },
                         body: JSON.stringify({
                             name: channelName,
-                            description: `Chat room for ${channelName}`,
-                            owner: username, // Using the current user as owner
+                            description: `Shared chat room for channel ${channelName}`,
+                            owner: username,
                             maxusers: 5000
                         }),
                     });
@@ -106,8 +107,16 @@ export async function POST(request: NextRequest) {
                         roomId = createData.data.id;
                         console.log('Created room successfully:', roomId);
                     } else {
-                        console.error('Failed to create room:', createData);
-                        // Fallback to channelName if creation fails (might work if roomId==channelName in some cases)
+                        // If someone else created it in the few seconds between our check and create,
+                        // retry finding it once.
+                        const retryRes = await fetch(`${roomsUrl}?limit=500`, {
+                            headers: { 'Authorization': `Bearer ${appToken}` }
+                        });
+                        const retryData = await retryRes.json();
+                        const retryRoom = retryData.data?.find((r: any) => r.name === channelName);
+                        if (retryRoom) {
+                            roomId = retryRoom.id;
+                        }
                     }
                 }
             } catch (roomErr) {

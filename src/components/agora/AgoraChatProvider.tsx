@@ -61,62 +61,66 @@ export function AgoraChatProvider({ appKey, token, username, channelName, roomId
                         setIsConnected(false);
                     },
                     onTextMessage: (message: any) => {
-                        console.log('Agora Chat: Message received', message);
-                        setMessages(prev => [...prev, {
-                            user: message.from || 'Unknown',
-                            text: message.msg,
-                            color: 'text-white', // Default color
-                            id: message.id
-                        }]);
+                        console.log('Agora Chat: Message received:', message);
+                        // Check if message is for the current room
+                        const target = roomId || channelName;
+                        if (message.type === 'chat' || (message.chatType === 'chatRoom' && message.to === target)) {
+                            setMessages(prev => [...prev, {
+                                user: message.from || 'Unknown',
+                                text: message.msg,
+                                color: 'text-white',
+                                id: message.id,
+                                isSelf: message.from === username
+                            }]);
+                        }
+                    },
+                    onChatroomEvent: (event: any) => {
+                        console.log('Agora Chat Room Event:', event);
                     },
                     onError: (error: any) => {
-                        // Type 206: "User logged in on another device". 
-                        // In dev (HMR) or rapid re-mounts, this is common. We can ignore it if we just reconnected.
                         if (error.type === 206) {
-                            console.warn('Agora Chat: 206 Warning (Duplicate Login - Expected in Dev)');
+                            console.warn('Agora Chat: 206 Warning (Duplicate Login)');
                             return;
                         }
                         console.error('Agora Chat Error:', JSON.stringify(error, null, 2));
-                        if (error?.type === 1) console.error('Token expired or invalid');
                     }
                 });
 
                 // Login
                 if (token && username) {
-                    // Small delay to ensure previous instance (if any) is fully closed/logged out on server
                     await new Promise(r => setTimeout(r, 500));
 
-                    console.log('Agora Chat: Attempting login...');
+                    console.log(`Agora Chat: Attempting login for ${username}...`);
                     try {
                         await client.open({
                             user: username,
                             accessToken: token,
                         });
-                        console.log('Agora Chat: Login call completed');
+                        console.log('Agora Chat: Login success');
 
                         // Join the chat room
-                        try {
-                            const targetRoom = roomId || channelName;
-                            if (targetRoom) {
-                                await client.joinChatRoom({ roomId: targetRoom });
-                                console.log(`Agora Chat: Joined room ${targetRoom}`);
-                            }
-                        } catch (joinErr: any) {
-                            // Suppress "User already in room" or similar if it's fine
-                            console.warn('Agora Chat: Join Room issue', joinErr);
+                        const targetRoom = roomId || channelName;
+                        if (targetRoom) {
+                            console.log(`Agora Chat: Attempting to join room: ${targetRoom}`);
+                            client.joinChatRoom({ roomId: targetRoom }).then(() => {
+                                console.log(`Agora Chat: Successfully joined room ${targetRoom}`);
+                            }).catch((joinErr: any) => {
+                                if (joinErr.type === 17) {
+                                    console.log('Agora Chat: User already in room');
+                                } else {
+                                    console.warn('Agora Chat: Join Room Failed', joinErr);
+                                }
+                            });
                         }
 
                     } catch (err: any) {
-                        // If 206 happens during OPEN, it throws. Catch it here too.
                         if (err.type === 206) {
-                            console.warn('Agora Chat: Login 206 (Already logged in), proceeding as connected.');
+                            console.warn('Agora Chat: Login 206 (Already logged in), proceeding.');
                             setIsConnected(true);
                         } else {
-                            console.error('Agora Chat Login Failed:', JSON.stringify(err, null, 2));
+                            console.error('Agora Chat Login Failed:', err);
                         }
                     }
-                } else {
-                    console.warn('Agora Chat: Missing token or username for login');
                 }
             } catch (error) {
                 console.error('Failed to init Agora Chat:', error);
@@ -125,20 +129,16 @@ export function AgoraChatProvider({ appKey, token, username, channelName, roomId
 
         if (appKey && token && username) {
             initSdk();
-        } else {
-            console.warn('Agora Chat: Missing required props - appKey:', !!appKey, 'token:', !!token, 'username:', !!username);
         }
 
         return () => {
             if (clientRef.current) {
-                // leave room before closing?
-                // clientRef.current.leaveChatRoom({ roomId: channelName });
                 clientRef.current.close();
             }
         };
-    }, [appKey, token, username, channelName]);
+    }, [appKey, token, username, channelName, roomId]);
 
-    // Cleanup messsages on channel/room change
+    // Cleanup messages on channel/room change
     useEffect(() => {
         setMessages([]);
     }, [channelName, roomId]);

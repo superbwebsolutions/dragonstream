@@ -291,8 +291,16 @@ function WatchPageContent({ channelName }: { channelName: string }) {
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col md:flex-row">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col md:flex-row overflow-hidden select-none">
             <style jsx global>{`
+                @media (max-width: 768px) {
+                    html, body {
+                        overflow: hidden !important;
+                        height: 100% !important;
+                        position: fixed !important;
+                        width: 100% !important;
+                    }
+                }
                 @media (max-width: 768px) and (orientation: landscape) {
                     .mobile-landscape-fullscreen {
                         position: fixed !important;
@@ -312,18 +320,21 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                 }
             `}</style>
 
-            <div className="w-full md:w-3/4 h-[50vh] md:h-full bg-gray-950 flex flex-col">
+            {/* MAIN CONTENT AREA: Video + Related + Buttons */}
+            <div className="w-full md:w-3/4 h-full bg-gray-950 flex flex-col overflow-hidden">
+
+                {/* Desktop Top Nav (Hidden on Mobile) */}
                 {!isHost && (
-                    <div className="h-14 md:h-16 flex items-center justify-between px-4 bg-gray-900 border-b border-yellow-600/20 shrink-0 z-20 relative mobile-landscape-hidden">
+                    <div className="hidden md:flex h-16 items-center justify-between px-4 bg-gray-900 border-b border-yellow-600/20 shrink-0 z-20 relative">
                         <a href="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
                             <div className="p-1.5 rounded-full bg-gray-800 group-hover:bg-gray-700 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                                 </svg>
                             </div>
-                            <span className="hidden md:inline text-sm font-medium">Back to Tables</span>
+                            <span className="text-sm font-medium">Back to Tables</span>
                         </a>
-                        <button onClick={goToNextStream} className="bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-500 px-3 py-1.5 md:px-4 md:py-2 rounded-full text-xs md:text-sm font-bold transition-all border border-yellow-600/30 flex items-center gap-2">
+                        <button onClick={goToNextStream} className="bg-yellow-600/20 hover:bg-yellow-600/30 text-yellow-500 px-4 py-2 rounded-full text-sm font-bold transition-all border border-yellow-600/30 flex items-center gap-2">
                             <span>Next Table</span>
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -332,48 +343,87 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     </div>
                 )}
 
-                <div className="flex-1 relative bg-black flex items-center justify-center overflow-hidden mobile-landscape-fullscreen" onTouchStart={handleTouchStart} onTouchMove={handleTouchMove} onTouchEnd={handleTouchEnd}>
+                {/* VIDEO FEED (takes available space on mobile, 75% on desktop) */}
+                <div
+                    className="flex-1 min-h-0 relative bg-black flex items-center justify-center overflow-hidden mobile-landscape-fullscreen touch-none"
+                    onTouchStart={handleTouchStart}
+                    onTouchMove={handleTouchMove}
+                    onTouchEnd={handleTouchEnd}
+                    style={{ touchAction: 'none' }}
+                >
                     {renderVideoContent()}
+
+                    {/* Mobile Hint for Swipe */}
+                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 md:hidden pointer-events-none opacity-40">
+                        <div className="flex flex-col items-center animate-bounce">
+                            <span className="text-[10px] text-white uppercase tracking-widest font-bold">Swipe up for next</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
 
+                {/* BOTTOM MOBILE SECTION (Related + Controls) */}
                 {!isHost && (
-                    <div className="h-auto md:h-36 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-3 md:p-4 overflow-hidden flex flex-col justify-center z-20 relative mobile-landscape-hidden">
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
+                    <div className="h-auto md:h-36 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-2 md:p-4 overflow-hidden flex flex-col justify-center z-20 relative mobile-landscape-hidden">
+
+                        <div className="flex items-center gap-2 mb-1 md:mb-2">
+                            <span className="text-[10px] md:text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
                             <span className="h-px flex-1 bg-yellow-600/20"></span>
                         </div>
-                        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin scrollbar-thumb-yellow-600/50">
+
+                        {/* Related Thumbnails list */}
+                        <div className="flex gap-2 md:gap-3 overflow-x-auto pb-1 scrollbar-none md:scrollbar-thin">
                             {relatedStreams.map((stream) => (
-                                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="flex-shrink-0 w-32 md:w-40 group relative">
+                                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="flex-shrink-0 w-24 md:w-40 group relative">
                                     <div className="aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-yellow-500/80 transition-all bg-gray-800">
                                         <Image src={stream.thumbnail} alt={stream.title} width={160} height={90} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
                                     </div>
-                                    <div className="mt-1 truncate text-[10px] md:text-xs font-medium text-gray-400 group-hover:text-yellow-400 text-center">{stream.title}</div>
+                                    <div className="mt-1 truncate text-[9px] md:text-xs font-medium text-gray-400 group-hover:text-yellow-400 text-center">{stream.title}</div>
                                 </Link>
                             ))}
+                        </div>
+
+                        {/* Mobile Navigation Buttons (Moved here to save space) */}
+                        <div className="flex md:hidden items-center justify-between mt-2 pt-2 border-t border-white/5">
+                            <a href="/" className="flex items-center gap-1.5 text-gray-400 text-[11px] font-bold uppercase tracking-tight">
+                                <div className="p-1 rounded-full bg-gray-800">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                    </svg>
+                                </div>
+                                <span>Exit</span>
+                            </a>
+
+                            <div className="flex flex-col items-center">
+                                <h1 className="text-white text-[10px] font-medium opacity-60 truncate max-w-[120px]">{decodeURIComponent(title)}</h1>
+                            </div>
+
+                            <button onClick={goToNextStream} className="flex items-center gap-1.5 text-yellow-500 text-[11px] font-bold uppercase tracking-tight">
+                                <span>Next</span>
+                                <div className="p-1 rounded-full bg-yellow-600/20 border border-yellow-600/30">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </button>
                         </div>
                     </div>
                 )}
             </div>
 
-            <div className="hidden md:flex md:w-1/4 h-full flex-col border-l border-yellow-600/20 bg-gray-950">
+            {/* CHAT AREA (Desktop Side | Mobile Bottom) */}
+            <div className="w-full md:w-1/4 h-[40vh] md:h-full flex flex-col border-t md:border-t-0 md:border-l border-yellow-600/20 bg-gray-950 overflow-hidden shrink-0">
                 {isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
                     <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
                         <ChatPanel channelName={decodeURIComponent(title)} />
                     </AgoraChatProvider>
                 ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-500">
-                        {isTokenLoading ? 'Loading Chat...' : 'Chat Unavailable'}
+                    <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
+                        {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
                     </div>
                 )}
-            </div>
-
-            <div className="md:hidden flex-1 bg-gray-950 border-t border-yellow-600/20 flex flex-col mobile-landscape-hidden">
-                {isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
-                    <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
-                        <ChatPanel channelName={decodeURIComponent(title)} />
-                    </AgoraChatProvider>
-                ) : null}
             </div>
         </div>
     );
