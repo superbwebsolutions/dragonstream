@@ -59,18 +59,19 @@ export function ChatPanel({ channelName = 'Live Stream', viewerCount = 125 }: Ch
             </div>
 
             {/* Input */}
-            <div className="p-4 border-t border-gray-800 bg-gray-900">
-                <form onSubmit={handleSend} className="relative">
+            <div className="p-4 border-t border-gray-800 bg-gray-900 shrink-0">
+                <form onSubmit={handleSend} className="flex gap-2 items-center">
                     <input
                         type="text"
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Send a message..."
-                        className="w-full bg-black border border-gray-700 rounded-xl px-4 py-3 pr-10 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 transition-colors text-sm"
+                        placeholder="Type a message..."
+                        className="flex-1 bg-black border border-gray-700 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-[16px] md:text-sm"
                     />
                     <button
                         type="submit"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-purple-500 hover:text-purple-400 p-1"
+                        className="bg-yellow-600 hover:bg-yellow-500 text-black p-3 rounded-xl transition-all flex items-center justify-center shrink-0"
+                        aria-label="Send message"
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />

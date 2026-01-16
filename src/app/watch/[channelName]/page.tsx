@@ -51,9 +51,12 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Swipe state
-    const touchStart = useRef<number | null>(null);
-    const touchEnd = useRef<number | null>(null);
+    // Mobile tab state: 'chat' | 'related'
+    const [mobileTab, setMobileTab] = useState<'chat' | 'related'>('chat');
+
+    // YouTube unmute state
+    const [isMuted, setIsMuted] = useState(true);
+    const iframeRef = useRef<HTMLIFrameElement>(null);
 
     // Navigation and Related Streams
     const currentIndex = allStreamsFlat.findIndex(s => s.youtubeId === channelName);
@@ -66,26 +69,6 @@ function WatchPageContent({ channelName }: { channelName: string }) {
         }
         const nextStream = allStreamsFlat[nextIndex];
         router.push(`/watch/${nextStream.youtubeId}?platform=youtube&title=${encodeURIComponent(nextStream.title)}`);
-    };
-
-    const handleTouchStart = (e: React.TouchEvent) => {
-        touchStart.current = e.targetTouches[0].clientY;
-    };
-
-    const handleTouchMove = (e: React.TouchEvent) => {
-        touchEnd.current = e.targetTouches[0].clientY;
-    };
-
-    const handleTouchEnd = () => {
-        if (!touchStart.current || !touchEnd.current) return;
-        const distance = touchStart.current - touchEnd.current;
-        const isSwipeUp = distance > 50;
-
-        if (isSwipeUp && !isHost) {
-            goToNextStream();
-        }
-        touchStart.current = null;
-        touchEnd.current = null;
     };
 
     // ==========================================
@@ -119,7 +102,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 username: data.username,
-                                channelName: channelName // Important: pass channelName to ensure room
+                                channelName: channelName
                             }),
                         });
                         const registerData = await registerRes.json();
@@ -134,7 +117,6 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     }
                 }
 
-                // Store RTC token AND Chat token (with roomId)
                 setTokenData({
                     token: data.token,
                     uid: data.uid,
@@ -171,13 +153,27 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                             </div>
                         )}
                         <iframe
-                            src={`https://www.youtube.com/embed/${channelName}?autoplay=1&mute=1&loop=1&playlist=${channelName}&controls=1&rel=0&modestbranding=1`}
+                            ref={iframeRef}
+                            src={`https://www.youtube.com/embed/${channelName}?autoplay=1&mute=${isMuted ? 1 : 0}&loop=1&playlist=${channelName}&controls=1&rel=0&modestbranding=1&enablejsapi=1`}
                             className="absolute inset-0 w-full h-full"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
                             onLoad={() => setIsLoaded(true)}
                         />
                     </div>
+                    {/* Unmute Button Overlay */}
+                    {isMuted && isLoaded && (
+                        <button
+                            onClick={() => setIsMuted(false)}
+                            className="absolute bottom-4 left-4 z-30 bg-black/70 hover:bg-black/90 text-white px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold transition-all border border-white/20"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" clipRule="evenodd" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />
+                            </svg>
+                            <span>Tap to Unmute</span>
+                        </button>
+                    )}
                 </div>
             );
         }
@@ -226,6 +222,9 @@ function WatchPageContent({ channelName }: { channelName: string }) {
         );
     };
 
+    // ==========================================
+    // MOCK CHAT PANEL (YouTube Mode)
+    // ==========================================
     const MockChatPanel = () => {
         const [mockMessages, setMockMessages] = useState<any[]>([
             { user: 'Lucky888', text: '好牌！', color: 'text-yellow-400' },
@@ -261,11 +260,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
         }
 
         return (
-            <div className="flex flex-col h-full bg-gray-950 border-l border-yellow-600/20">
-                <div className="p-4 border-b border-yellow-600/20 bg-gray-900">
-                    <h2 className="text-white font-bold text-sm truncate">{decodeURIComponent(title)}</h2>
-                    <span className="text-xs text-gray-400">{count}K Viewers</span>
-                </div>
+            <div className="flex flex-col h-full bg-gray-950">
                 <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-950">
                     {mockMessages.map((msg, i) => (
                         <div key={i} className="text-sm">
@@ -275,20 +270,47 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     ))}
                     <div ref={chatRef} />
                 </div>
-                <div className="p-4 border-t border-yellow-600/20 bg-gray-900">
-                    <form onSubmit={send} className="relative">
+                <div className="p-3 border-t border-yellow-600/20 bg-gray-900 shrink-0">
+                    <form onSubmit={send} className="flex gap-2 items-center">
                         <input
                             type="text"
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
-                            placeholder="Send a message..."
-                            className="w-full bg-gray-800 border border-yellow-600/30 rounded-xl px-4 py-3 pr-10 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-sm"
+                            placeholder="Type a message..."
+                            className="flex-1 bg-gray-800 border border-yellow-600/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-[16px] md:text-sm"
                         />
+                        <button
+                            type="submit"
+                            className="bg-yellow-600 hover:bg-yellow-500 text-black p-3 rounded-xl transition-all shrink-0"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                            </svg>
+                        </button>
                     </form>
                 </div>
             </div>
         );
     };
+
+    // ==========================================
+    // RELATED VIDEOS PANEL
+    // ==========================================
+    const RelatedPanel = () => (
+        <div className="flex flex-col h-full bg-gray-950 overflow-y-auto p-3 space-y-3">
+            {relatedStreams.map((stream) => (
+                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="flex gap-3 group">
+                    <div className="w-28 aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-yellow-500/80 transition-all bg-gray-800 shrink-0">
+                        <Image src={stream.thumbnail} alt={stream.title} width={160} height={90} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="text-white text-sm font-medium truncate group-hover:text-yellow-400">{stream.title}</h3>
+                        <p className="text-gray-500 text-xs mt-1">Live Now</p>
+                    </div>
+                </Link>
+            ))}
+        </div>
+    );
 
     return (
         <div className="fixed inset-0 z-50 bg-black flex flex-col md:flex-row overflow-hidden select-none">
@@ -320,8 +342,8 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                 }
             `}</style>
 
-            {/* MAIN CONTENT AREA: Video + Related + Buttons */}
-            <div className="w-full md:w-3/4 h-full bg-gray-950 flex flex-col overflow-hidden">
+            {/* MAIN CONTENT AREA: Video */}
+            <div className="w-full md:w-3/4 h-auto md:h-full bg-gray-950 flex flex-col overflow-hidden shrink-0">
 
                 {/* Desktop Top Nav (Hidden on Mobile) */}
                 {!isHost && (
@@ -343,87 +365,111 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     </div>
                 )}
 
-                {/* VIDEO FEED (takes available space on mobile, 75% on desktop) */}
+                {/* VIDEO FEED */}
                 <div
-                    className="flex-1 min-h-0 relative bg-black flex items-center justify-center overflow-hidden mobile-landscape-fullscreen touch-none"
-                    onTouchStart={handleTouchStart}
-                    onTouchMove={handleTouchMove}
-                    onTouchEnd={handleTouchEnd}
+                    className="h-[40vh] md:flex-1 min-h-0 relative bg-black flex items-center justify-center overflow-hidden mobile-landscape-fullscreen touch-none shrink-0"
                     style={{ touchAction: 'none' }}
                 >
                     {renderVideoContent()}
-
-                    {/* Mobile Hint for Swipe */}
-                    <div className="absolute bottom-4 left-1/2 -translate-x-1/2 md:hidden pointer-events-none opacity-40">
-                        <div className="flex flex-col items-center animate-bounce">
-                            <span className="text-[10px] text-white uppercase tracking-widest font-bold">Swipe up for next</span>
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-yellow-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
-                            </svg>
-                        </div>
-                    </div>
                 </div>
 
-                {/* BOTTOM MOBILE SECTION (Related + Controls) */}
+                {/* Mobile Navigation Buttons */}
                 {!isHost && (
-                    <div className="h-auto md:h-36 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-2 md:p-4 overflow-hidden flex flex-col justify-center z-20 relative mobile-landscape-hidden">
+                    <div className="flex md:hidden items-center justify-between px-3 py-2 bg-gray-900 border-t border-yellow-600/20 shrink-0 z-20 mobile-landscape-hidden">
+                        <a href="/" className="flex items-center gap-1.5 text-gray-400 text-[11px] font-bold uppercase tracking-tight">
+                            <div className="p-1.5 rounded-full bg-gray-800">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                                </svg>
+                            </div>
+                            <span>Exit</span>
+                        </a>
 
-                        <div className="flex items-center gap-2 mb-1 md:mb-2">
-                            <span className="text-[10px] md:text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
+                        <h1 className="text-white text-xs font-medium opacity-70 truncate max-w-[140px]">{decodeURIComponent(title)}</h1>
+
+                        <button onClick={goToNextStream} className="flex items-center gap-1.5 text-yellow-500 text-[11px] font-bold uppercase tracking-tight">
+                            <span>Next</span>
+                            <div className="p-1.5 rounded-full bg-yellow-600/20 border border-yellow-600/30">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </button>
+                    </div>
+                )}
+
+                {/* Desktop Related Section (Hidden on Mobile) */}
+                {!isHost && (
+                    <div className="hidden md:block h-36 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-4 overflow-hidden z-20 relative">
+                        <div className="flex items-center gap-2 mb-2">
+                            <span className="text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
                             <span className="h-px flex-1 bg-yellow-600/20"></span>
                         </div>
-
-                        {/* Related Thumbnails list */}
-                        <div className="flex gap-2 md:gap-3 overflow-x-auto pb-1 scrollbar-none md:scrollbar-thin">
+                        <div className="flex gap-3 overflow-x-auto pb-1 scrollbar-thin">
                             {relatedStreams.map((stream) => (
-                                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="flex-shrink-0 w-24 md:w-40 group relative">
+                                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="flex-shrink-0 w-40 group relative">
                                     <div className="aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-yellow-500/80 transition-all bg-gray-800">
                                         <Image src={stream.thumbnail} alt={stream.title} width={160} height={90} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
                                     </div>
-                                    <div className="mt-1 truncate text-[9px] md:text-xs font-medium text-gray-400 group-hover:text-yellow-400 text-center">{stream.title}</div>
+                                    <div className="mt-1 truncate text-xs font-medium text-gray-400 group-hover:text-yellow-400 text-center">{stream.title}</div>
                                 </Link>
                             ))}
-                        </div>
-
-                        {/* Mobile Navigation Buttons (Moved here to save space) */}
-                        <div className="flex md:hidden items-center justify-between mt-2 pt-2 border-t border-white/5">
-                            <a href="/" className="flex items-center gap-1.5 text-gray-400 text-[11px] font-bold uppercase tracking-tight">
-                                <div className="p-1 rounded-full bg-gray-800">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                                    </svg>
-                                </div>
-                                <span>Exit</span>
-                            </a>
-
-                            <div className="flex flex-col items-center">
-                                <h1 className="text-white text-[10px] font-medium opacity-60 truncate max-w-[120px]">{decodeURIComponent(title)}</h1>
-                            </div>
-
-                            <button onClick={goToNextStream} className="flex items-center gap-1.5 text-yellow-500 text-[11px] font-bold uppercase tracking-tight">
-                                <span>Next</span>
-                                <div className="p-1 rounded-full bg-yellow-600/20 border border-yellow-600/30">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                                    </svg>
-                                </div>
-                            </button>
                         </div>
                     </div>
                 )}
             </div>
 
-            {/* CHAT AREA (Desktop Side | Mobile Bottom) */}
-            <div className="w-full md:w-1/4 h-[40vh] md:h-full flex flex-col border-t md:border-t-0 md:border-l border-yellow-600/20 bg-gray-950 overflow-hidden shrink-0">
-                {isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
-                    <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
-                        <ChatPanel channelName={decodeURIComponent(title)} />
-                    </AgoraChatProvider>
-                ) : (
-                    <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
-                        {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
+            {/* MOBILE: Tabbed Chat/Related Area */}
+            <div className="flex-1 md:w-1/4 md:h-full flex flex-col border-t md:border-t-0 md:border-l border-yellow-600/20 bg-gray-950 overflow-hidden min-h-0">
+
+                {/* Mobile Tabs (Hidden on Desktop) */}
+                <div className="flex md:hidden border-b border-yellow-600/20 shrink-0">
+                    <button
+                        onClick={() => setMobileTab('chat')}
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${mobileTab === 'chat' ? 'text-yellow-500 border-b-2 border-yellow-500 bg-gray-900' : 'text-gray-500'}`}
+                    >
+                        💬 Chat
+                    </button>
+                    <button
+                        onClick={() => setMobileTab('related')}
+                        className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${mobileTab === 'related' ? 'text-yellow-500 border-b-2 border-yellow-500 bg-gray-900' : 'text-gray-500'}`}
+                    >
+                        📺 Related
+                    </button>
+                </div>
+
+                {/* Desktop: Always show Chat | Mobile: Show based on tab */}
+                <div className="flex-1 overflow-hidden min-h-0">
+                    {/* Desktop always shows chat */}
+                    <div className="hidden md:flex h-full flex-col">
+                        {isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
+                            <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
+                                <ChatPanel channelName={decodeURIComponent(title)} />
+                            </AgoraChatProvider>
+                        ) : (
+                            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
+                                {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
+                            </div>
+                        )}
                     </div>
-                )}
+
+                    {/* Mobile: Conditional rendering based on tab */}
+                    <div className="md:hidden h-full flex flex-col">
+                        {mobileTab === 'chat' ? (
+                            isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
+                                <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
+                                    <ChatPanel channelName={decodeURIComponent(title)} />
+                                </AgoraChatProvider>
+                            ) : (
+                                <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
+                                    {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
+                                </div>
+                            )
+                        ) : (
+                            <RelatedPanel />
+                        )}
+                    </div>
+                </div>
             </div>
         </div>
     );
