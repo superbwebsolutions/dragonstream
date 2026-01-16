@@ -48,6 +48,30 @@ export function AgoraChatProvider({ appKey, token, username, channelName, roomId
         }
 
         const initSdk = async () => {
+            // Helper to robustly join the room
+            const joinCurrentRoom = async (retries = 3) => {
+                if (!targetRoom || !globalClient) return;
+
+                try {
+                    console.log(`Agora Chat [${myInstanceId}]: Attempting to join room: ${targetRoom}`);
+                    await globalClient.joinChatRoom({ roomId: targetRoom });
+                    console.log(`Agora Chat [${myInstanceId}]: Joined room success: ${targetRoom}`);
+                    if (mountedRef.current) setIsRoomJoined(true);
+                } catch (error: any) {
+                    // Error 603: User already in the group/chatroom
+                    if (error?.type === 603 || error?.message?.includes('already in')) {
+                        console.log(`Agora Chat [${myInstanceId}]: Already in room ${targetRoom}`);
+                        if (mountedRef.current) setIsRoomJoined(true);
+                    } else if (retries > 0) {
+                        console.warn(`Agora Chat [${myInstanceId}]: Failed to join room, retrying... (${retries} left)`, error);
+                        setTimeout(() => joinCurrentRoom(retries - 1), 1000);
+                    } else {
+                        console.error(`Agora Chat [${myInstanceId}]: Failed to join room after retries:`, error);
+                        if (mountedRef.current) setIsRoomJoined(false);
+                    }
+                }
+            };
+
             // If already initializing or initialized, just attach to existing client
             if (globalInitPromise) {
                 await globalInitPromise;
@@ -56,7 +80,8 @@ export function AgoraChatProvider({ appKey, token, username, channelName, roomId
                     // Check if already connected
                     if (globalClient.isOpened?.()) {
                         setIsConnected(true);
-                        setIsRoomJoined(true);
+                        // ALWAYS try to join the target room when reusing, in case we switched rooms
+                        joinCurrentRoom();
                     }
                 }
                 return;
@@ -95,36 +120,7 @@ export function AgoraChatProvider({ appKey, token, username, channelName, roomId
                             setIsConnected(true);
 
                             // JOIN ROOM HERE - after connection is fully established
-                            if (targetRoom) {
-                                console.log(`Agora Chat [${myInstanceId}]: Joining room: ${targetRoom}`);
-
-                                try {
-                                    await client.joinChatRoom({ roomId: targetRoom });
-                                    if (!mountedRef.current) return;
-                                    console.log(`Agora Chat [${myInstanceId}]: Successfully joined room ${targetRoom}`);
-                                    setIsRoomJoined(true);
-                                } catch (joinErr: any) {
-                                    if (joinErr.type === 17 || joinErr.message?.includes('already')) {
-                                        console.log(`Agora Chat [${myInstanceId}]: User already in room - OK`);
-                                        if (mountedRef.current) setIsRoomJoined(true);
-                                    } else {
-                                        console.error(`Agora Chat [${myInstanceId}]: Join Room Failed:`, joinErr);
-                                        // Retry once after a short delay
-                                        setTimeout(async () => {
-                                            if (!mountedRef.current) return;
-                                            try {
-                                                await client.joinChatRoom({ roomId: targetRoom });
-                                                if (mountedRef.current) {
-                                                    console.log(`Agora Chat [${myInstanceId}]: Retry join successful`);
-                                                    setIsRoomJoined(true);
-                                                }
-                                            } catch (retryErr) {
-                                                console.error(`Agora Chat [${myInstanceId}]: Retry join also failed:`, retryErr);
-                                            }
-                                        }, 1000);
-                                    }
-                                }
-                            }
+                            joinCurrentRoom();
                         },
                         onDisconnected: () => {
                             // Only reset state if this is still the active instance and mounted

@@ -19,17 +19,17 @@ export function HeroSection({ title, subtitle, category, emoji, description, hos
             <img
                 src={image.replace('hqdefault', 'maxresdefault')}
                 alt={`${subtitle} - ${title}`}
-                className="absolute inset-0 w-full h-full object-cover opacity-60 transition-transform duration-700 group-hover:scale-105"
+                className="absolute inset-0 w-full h-full object-cover opacity-80 transition-transform duration-700 group-hover:scale-105"
             />
 
-            {/* Dark overlay - increased opacity for readability */}
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/40 z-10"></div>
+            {/* Dark overlay - reduced opacity for visibility */}
+            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10"></div>
 
-            {/* Additional overlay for rounded container to prevent cut-off */}
-            <div className="absolute inset-0 bg-gradient-to-b from-black/50 md:from-black/30 to-transparent z-10"></div>
+            {/* Additional overlay for rounded container to prevent cut-off - Lighter */}
+            <div className="absolute inset-0 bg-gradient-to-b from-black/30 md:from-black/20 to-transparent z-10"></div>
 
-            {/* Decorative accent overlay */}
-            <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/5 via-transparent to-red-900/10 z-10"></div>
+            {/* Decorative accent overlay - Lighter */}
+            <div className="absolute inset-0 bg-gradient-to-br from-yellow-600/5 via-transparent to-red-900/5 z-10"></div>
 
             {/* Content Overlay - positioned lower on desktop */}
             <div className="absolute bottom-0 left-0 w-full p-6 md:p-12 z-20 flex flex-col items-start gap-3 md:gap-4">

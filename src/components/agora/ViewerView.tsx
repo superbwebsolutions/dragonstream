@@ -68,8 +68,7 @@ export function ViewerView({
             </div>
 
             {/* Gradient Overlay for Readability */}
-            <div className="absolute inset-x-0 bottom-0 h-40 bg-gradient-to-t from-black/80 to-transparent pointer-events-none z-0"></div>
-            <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-black/60 to-transparent pointer-events-none z-0"></div>
+
         </div>
     );
 }

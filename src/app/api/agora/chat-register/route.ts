@@ -69,26 +69,51 @@ export async function POST(request: NextRequest) {
         // 2. Ensure Chat Room existence for channelName
         let roomId = '';
         if (channelName) {
-            console.log('Ensuring Chat Room for channel:', channelName);
+            const normalizedChannelName = channelName.trim();
+            console.log('Ensuring Chat Room for channel:', normalizedChannelName);
             const roomsUrl = `${restApiHost}/${orgName}/${appName}/chatrooms`;
 
             try {
-                // List rooms to see if it exists - increase limit to find older rooms
-                const listRes = await fetch(`${roomsUrl}?limit=500`, {
-                    headers: { 'Authorization': `Bearer ${appToken}` }
-                });
-                const listData = await listRes.json();
+                // Helper to fetch all rooms with pagination
+                const fetchAllRooms = async () => {
+                    let allRooms: any[] = [];
+                    let cursor = '';
+                    let hasMore = true;
 
-                // Find the existing room by name (channelName)
-                // We pick the earliest one if multiple exist for consistency
-                const existingRoom = listData.data?.find((r: any) => r.name === channelName);
+                    while (hasMore) {
+                        const url = `${roomsUrl}?limit=1000${cursor ? `&cursor=${cursor}` : ''}`;
+                        const res = await fetch(url, {
+                            headers: { 'Authorization': `Bearer ${appToken}` }
+                        });
+                        const data = await res.json();
+
+                        if (data.data) {
+                            allRooms = [...allRooms, ...data.data];
+                        }
+
+                        if (data.cursor) {
+                            cursor = data.cursor;
+                        } else {
+                            hasMore = false;
+                        }
+
+                        // Safety break for extremely large lists to prevent timeout
+                        if (allRooms.length > 5000) break;
+                    }
+                    return allRooms;
+                };
+
+                const existingRooms = await fetchAllRooms();
+
+                // Find existing room by name
+                const existingRoom = existingRooms.find((r: any) => r.name === normalizedChannelName);
 
                 if (existingRoom) {
                     roomId = existingRoom.id;
-                    console.log('Found existing room:', roomId, 'for channel:', channelName);
+                    console.log('Found existing room:', roomId, 'for channel:', normalizedChannelName);
                 } else {
                     // Create new room if none found
-                    console.log('Creating new chat room for channel:', channelName);
+                    console.log('Creating new chat room for channel:', normalizedChannelName);
                     const createRes = await fetch(roomsUrl, {
                         method: 'POST',
                         headers: {
@@ -96,8 +121,8 @@ export async function POST(request: NextRequest) {
                             'Authorization': `Bearer ${appToken}`,
                         },
                         body: JSON.stringify({
-                            name: channelName,
-                            description: `Shared chat room for channel ${channelName}`,
+                            name: normalizedChannelName,
+                            description: `Shared chat room for channel ${normalizedChannelName}`,
                             owner: username,
                             maxusers: 5000
                         }),
@@ -107,16 +132,13 @@ export async function POST(request: NextRequest) {
                         roomId = createData.data.id;
                         console.log('Created room successfully:', roomId);
                     } else {
-                        // If someone else created it in the few seconds between our check and create,
-                        // retry finding it once.
-                        const retryRes = await fetch(`${roomsUrl}?limit=500`, {
+                        console.error('Failed to create room:', createData);
+                        // Fallback: try to find one more time in case of race condition
+                        const retryRooms = await fetch(`${roomsUrl}?limit=1000`, {
                             headers: { 'Authorization': `Bearer ${appToken}` }
-                        });
-                        const retryData = await retryRes.json();
-                        const retryRoom = retryData.data?.find((r: any) => r.name === channelName);
-                        if (retryRoom) {
-                            roomId = retryRoom.id;
-                        }
+                        }).then(r => r.json()).then(d => d.data || []);
+                        const retryRoom = retryRooms.find((r: any) => r.name === normalizedChannelName);
+                        if (retryRoom) roomId = retryRoom.id;
                     }
                 }
             } catch (roomErr) {

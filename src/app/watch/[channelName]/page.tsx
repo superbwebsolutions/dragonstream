@@ -467,36 +467,82 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                 </div>
 
                 {/* Desktop: Always show Chat | Mobile: Show based on tab */}
-                <div className="flex-1 overflow-hidden min-h-0">
-                    {/* Desktop always shows chat */}
-                    <div className="hidden md:flex h-full flex-col">
-                        {isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
-                            <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
-                                <ChatPanel channelName={decodeURIComponent(title)} />
+                <div className="flex-1 overflow-hidden min-h-0 relative">
+                    {/* YOUTUBE MODE (Mock Chat) */}
+                    {isYoutube ? (
+                        <>
+                            {/* Desktop */}
+                            <div className="hidden md:flex h-full flex-col">
+                                <MockChatPanel />
+                            </div>
+                            {/* Mobile */}
+                            <div className="md:hidden flex h-full flex-col">
+                                {mobileTab === 'chat' ? (
+                                    <MockChatPanel />
+                                ) : (
+                                    <div className="h-full overflow-y-auto bg-gray-900 p-4">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {relatedStreams.map((stream) => (
+                                                <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="group">
+                                                    <div className="aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-yellow-500/80 transition-all bg-gray-800 mb-2">
+                                                        <Image src={stream.thumbnail} alt={stream.title} width={320} height={180} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+                                                    </div>
+                                                    <div className="text-xs font-medium text-gray-400 group-hover:text-white line-clamp-2">{stream.title}</div>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </>
+                    ) : (
+                        /* AGORA LIVE MODE */
+                        tokenData?.chatToken ? (
+                            <AgoraChatProvider
+                                appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!}
+                                token={tokenData.chatToken}
+                                username={tokenData.username || 'guest'}
+                                channelName={channelName}
+                                roomId={tokenData.roomId}
+                            >
+                                {/* Desktop: Always Chat */}
+                                <div className="hidden md:flex h-full flex-col">
+                                    <ChatPanel channelName={decodeURIComponent(title)} />
+                                </div>
+
+                                {/* Mobile: Chat OR Related */}
+                                <div className="md:hidden flex h-full flex-col">
+                                    {mobileTab === 'chat' ? (
+                                        <ChatPanel channelName={decodeURIComponent(title)} />
+                                    ) : (
+                                        <div className="h-full overflow-y-auto bg-gray-900 p-4">
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {relatedStreams.map((stream) => (
+                                                    <Link key={stream.id} href={`/watch/${stream.youtubeId}?platform=youtube&title=${encodeURIComponent(stream.title)}`} className="group">
+                                                        <div className="aspect-video rounded-lg overflow-hidden border border-white/10 group-hover:border-yellow-500/80 transition-all bg-gray-800 mb-2">
+                                                            <Image src={stream.thumbnail} alt={stream.title} width={320} height={180} className="w-full h-full object-cover opacity-80 group-hover:opacity-100" />
+                                                        </div>
+                                                        <div className="text-xs font-medium text-gray-400 group-hover:text-white line-clamp-2">{stream.title}</div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                             </AgoraChatProvider>
                         ) : (
-                            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
-                                {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
+                            <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic h-full">
+                                {isTokenLoading ? (
+                                    <div className="flex flex-col items-center gap-2">
+                                        <div className="w-5 h-5 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin"></div>
+                                        <span>Connecting to Chat...</span>
+                                    </div>
+                                ) : (
+                                    <span>Chat Unavailable</span>
+                                )}
                             </div>
-                        )}
-                    </div>
-
-                    {/* Mobile: Conditional rendering based on tab */}
-                    <div className="md:hidden h-full flex flex-col">
-                        {mobileTab === 'chat' ? (
-                            isYoutube ? <MockChatPanel /> : tokenData?.chatToken ? (
-                                <AgoraChatProvider appKey={process.env.NEXT_PUBLIC_AGORA_CHAT_APP_KEY!} token={tokenData.chatToken} username={tokenData.username || 'guest'} channelName={channelName} roomId={tokenData.roomId}>
-                                    <ChatPanel channelName={decodeURIComponent(title)} />
-                                </AgoraChatProvider>
-                            ) : (
-                                <div className="flex-1 flex items-center justify-center text-gray-500 text-sm italic">
-                                    {isTokenLoading ? 'Connecting to Chat...' : 'Chat Unavailable'}
-                                </div>
-                            )
-                        ) : (
-                            <RelatedPanel />
-                        )}
-                    </div>
+                        )
+                    )}
                 </div>
             </div>
         </div>
