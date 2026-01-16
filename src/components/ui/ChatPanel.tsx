@@ -9,7 +9,7 @@ interface ChatPanelProps {
 }
 
 export function ChatPanel({ channelName = 'Live Stream', viewerCount = 125 }: ChatPanelProps) {
-    const { messages, sendMessage, username } = useAgoraChat();
+    const { messages, sendMessage, username, isConnected } = useAgoraChat();
 
     // Use passed viewerCount or default
     const displayCount = viewerCount;

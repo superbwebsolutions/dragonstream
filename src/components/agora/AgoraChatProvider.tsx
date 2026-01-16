@@ -1,8 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useEffect, useRef, useState } from 'react';
-// import type { Connection } from 'agora-chat'; // Skipping type import to avoid TS errors
-const Connection: any = null;
+import React, { createContext, useContext, useEffect, useRef, useState, useCallback } from 'react';
 
 interface AgoraChatContextType {
     isConnected: boolean;
@@ -17,183 +15,305 @@ interface AgoraChatProviderProps {
     appKey: string;
     token: string;
     username: string;
-    channelName: string; // Original channel name
-    roomId?: string; // New: Specific Agora Chat Room ID
+    channelName: string;
+    roomId?: string;
     children: React.ReactNode;
 }
 
+// Module-level singleton to prevent React Strict Mode double initialization
+let globalClient: any = null;
+let globalClientId: number = 0;
+let globalInitPromise: Promise<void> | null = null;
+
 export function AgoraChatProvider({ appKey, token, username, channelName, roomId, children }: AgoraChatProviderProps) {
     const [isConnected, setIsConnected] = useState(false);
+    const [isRoomJoined, setIsRoomJoined] = useState(false);
     const [messages, setMessages] = useState<any[]>([]);
-    const clientRef = useRef<any>(null);
     const [AgoraChat, setAgoraChat] = useState<any>(null);
 
-    // Initialize SDK
-    useEffect(() => {
-        const initSdk = async () => {
-            console.log('Agora Chat: Initializing with appKey:', appKey);
-            console.log('Agora Chat: Username:', username);
-            console.log('Agora Chat: Token (first 20 chars):', token?.substring(0, 20) + '...');
+    // Instance tracking
+    const instanceId = useRef(++globalClientId);
+    const mountedRef = useRef(true);
 
-            if (!appKey) {
-                console.error('Agora Chat: No appKey provided!');
+    // Target room ID
+    const targetRoom = roomId || channelName;
+
+    // Initialize SDK - singleton approach to handle React Strict Mode
+    useEffect(() => {
+        mountedRef.current = true;
+        const myInstanceId = instanceId.current;
+
+        if (!appKey || !token || !username) {
+            return;
+        }
+
+        const initSdk = async () => {
+            // If already initializing or initialized, just attach to existing client
+            if (globalInitPromise) {
+                await globalInitPromise;
+                if (globalClient && mountedRef.current) {
+                    console.log(`Agora Chat [${myInstanceId}]: Reusing existing connection`);
+                    // Check if already connected
+                    if (globalClient.isOpened?.()) {
+                        setIsConnected(true);
+                        setIsRoomJoined(true);
+                    }
+                }
                 return;
             }
 
-            try {
-                const mod = await import('agora-chat');
-                setAgoraChat(mod.default);
+            console.log(`Agora Chat [${myInstanceId}]: Initializing with appKey:`, appKey);
+            console.log(`Agora Chat [${myInstanceId}]: Username:`, username);
+            console.log(`Agora Chat [${myInstanceId}]: Target Room:`, targetRoom);
 
-                const client = new mod.default.connection({
-                    appKey: appKey,
-                });
-                clientRef.current = client;
+            globalInitPromise = (async () => {
+                try {
+                    const mod = await import('agora-chat');
+                    if (!mountedRef.current) return;
 
+                    setAgoraChat(mod.default);
 
-
-                client.addEventHandler('connection&message', {
-                    onConnected: () => {
-                        console.log('Agora Chat: Connected successfully!');
-                        setIsConnected(true);
-                    },
-                    onDisconnected: () => {
-                        console.log('Agora Chat: Disconnected');
-                        setIsConnected(false);
-                    },
-                    onTextMessage: (message: any) => {
-                        console.log('Agora Chat: Message received:', message);
-                        // Check if message is for the current room
-                        const target = roomId || channelName;
-                        if (message.type === 'chat' || (message.chatType === 'chatRoom' && message.to === target)) {
-                            setMessages(prev => [...prev, {
-                                user: message.from || 'Unknown',
-                                text: message.msg,
-                                color: 'text-white',
-                                id: message.id,
-                                isSelf: message.from === username
-                            }]);
+                    // Close any existing client first
+                    if (globalClient) {
+                        try {
+                            globalClient.close();
+                        } catch (e) {
+                            // Ignore
                         }
-                    },
-                    onChatroomEvent: (event: any) => {
-                        console.log('Agora Chat Room Event:', event);
-                    },
-                    onError: (error: any) => {
-                        if (error.type === 206) {
-                            console.warn('Agora Chat: 206 Warning (Duplicate Login)');
-                            return;
-                        }
-                        console.error('Agora Chat Error:', JSON.stringify(error, null, 2));
                     }
-                });
 
-                // Login
-                if (token && username) {
-                    await new Promise(r => setTimeout(r, 500));
+                    const client = new mod.default.connection({
+                        appKey: appKey,
+                    });
+                    globalClient = client;
 
-                    console.log(`Agora Chat: Attempting login for ${username}...`);
+                    // Set up event handlers
+                    client.addEventHandler('connection&message', {
+                        onConnected: async () => {
+                            if (!mountedRef.current) return;
+                            console.log(`Agora Chat [${myInstanceId}]: WebSocket Connected - Now joining room...`);
+                            setIsConnected(true);
+
+                            // JOIN ROOM HERE - after connection is fully established
+                            if (targetRoom) {
+                                console.log(`Agora Chat [${myInstanceId}]: Joining room: ${targetRoom}`);
+
+                                try {
+                                    await client.joinChatRoom({ roomId: targetRoom });
+                                    if (!mountedRef.current) return;
+                                    console.log(`Agora Chat [${myInstanceId}]: Successfully joined room ${targetRoom}`);
+                                    setIsRoomJoined(true);
+                                } catch (joinErr: any) {
+                                    if (joinErr.type === 17 || joinErr.message?.includes('already')) {
+                                        console.log(`Agora Chat [${myInstanceId}]: User already in room - OK`);
+                                        if (mountedRef.current) setIsRoomJoined(true);
+                                    } else {
+                                        console.error(`Agora Chat [${myInstanceId}]: Join Room Failed:`, joinErr);
+                                        // Retry once after a short delay
+                                        setTimeout(async () => {
+                                            if (!mountedRef.current) return;
+                                            try {
+                                                await client.joinChatRoom({ roomId: targetRoom });
+                                                if (mountedRef.current) {
+                                                    console.log(`Agora Chat [${myInstanceId}]: Retry join successful`);
+                                                    setIsRoomJoined(true);
+                                                }
+                                            } catch (retryErr) {
+                                                console.error(`Agora Chat [${myInstanceId}]: Retry join also failed:`, retryErr);
+                                            }
+                                        }, 1000);
+                                    }
+                                }
+                            }
+                        },
+                        onDisconnected: () => {
+                            // Only reset state if this is still the active instance and mounted
+                            if (!mountedRef.current) return;
+                            console.log(`Agora Chat [${myInstanceId}]: Disconnected`);
+                            // Don't reset state immediately - might be a temporary disconnect
+                            // The 206 duplicate login causes a disconnect but then reconnects
+                        },
+                        onTextMessage: (message: any) => {
+                            if (!mountedRef.current) return;
+                            console.log(`Agora Chat [${myInstanceId}]: Message received:`, message);
+                            // Accept all chatRoom messages
+                            if (message.chatType === 'chatRoom') {
+                                // Add message if it's not from self (self messages added on send)
+                                if (message.from !== username) {
+                                    setMessages(prev => [...prev, {
+                                        user: message.from || 'Unknown',
+                                        text: message.msg,
+                                        color: 'text-white',
+                                        id: message.id,
+                                        isSelf: false,
+                                        timestamp: Date.now()
+                                    }]);
+                                }
+                            }
+                        },
+                        onChatroomEvent: (event: any) => {
+                            console.log(`Agora Chat [${myInstanceId}] Room Event:`, event);
+                        },
+                        onError: (error: any) => {
+                            if (error.type === 206) {
+                                // Duplicate login - this is expected with React Strict Mode
+                                console.warn(`Agora Chat [${myInstanceId}]: 206 Warning (Duplicate Login) - Ignored`);
+                                return;
+                            }
+                            console.error(`Agora Chat [${myInstanceId}] Error:`, error);
+                        }
+                    });
+
+                    // Open connection (login)
+                    console.log(`Agora Chat [${myInstanceId}]: Opening connection for ${username}...`);
                     try {
                         await client.open({
                             user: username,
                             accessToken: token,
                         });
-                        console.log('Agora Chat: Login success');
-
-                        // Join the chat room
-                        const targetRoom = roomId || channelName;
-                        if (targetRoom) {
-                            console.log(`Agora Chat: Attempting to join room: ${targetRoom}`);
-                            client.joinChatRoom({ roomId: targetRoom }).then(() => {
-                                console.log(`Agora Chat: Successfully joined room ${targetRoom}`);
-                            }).catch((joinErr: any) => {
-                                if (joinErr.type === 17) {
-                                    console.log('Agora Chat: User already in room');
-                                } else {
-                                    console.warn('Agora Chat: Join Room Failed', joinErr);
-                                }
-                            });
-                        }
-
+                        console.log(`Agora Chat [${myInstanceId}]: Login/Open completed`);
                     } catch (err: any) {
                         if (err.type === 206) {
-                            console.warn('Agora Chat: Login 206 (Already logged in), proceeding.');
-                            setIsConnected(true);
+                            console.warn(`Agora Chat [${myInstanceId}]: Already logged in (206), setting connected state`);
+                            if (mountedRef.current) {
+                                setIsConnected(true);
+                                // Try to join room anyway
+                                if (targetRoom) {
+                                    try {
+                                        await client.joinChatRoom({ roomId: targetRoom });
+                                        if (mountedRef.current) setIsRoomJoined(true);
+                                    } catch (e) {
+                                        // Might already be in room
+                                        if (mountedRef.current) setIsRoomJoined(true);
+                                    }
+                                }
+                            }
                         } else {
-                            console.error('Agora Chat Login Failed:', err);
+                            console.error(`Agora Chat [${myInstanceId}] Login Failed:`, err);
                         }
                     }
+                } catch (error) {
+                    console.error(`Agora Chat [${myInstanceId}]: Failed to init:`, error);
                 }
-            } catch (error) {
-                console.error('Failed to init Agora Chat:', error);
-            }
+            })();
+
+            await globalInitPromise;
         };
 
-        if (appKey && token && username) {
-            initSdk();
-        }
+        initSdk();
 
         return () => {
-            if (clientRef.current) {
-                clientRef.current.close();
-            }
+            mountedRef.current = false;
+            // Don't close the global client on unmount - it's a singleton
+            // Only reset the init promise so a fresh mount can reinitialize if needed
+            // This handles the React Strict Mode double mount/unmount cycle
         };
-    }, [appKey, token, username, channelName, roomId]);
+    }, [appKey, token, username, targetRoom]);
 
-    // Cleanup messages on channel/room change
+    // Cleanup on full unmount (not just Strict Mode remount)
     useEffect(() => {
-        setMessages([]);
-    }, [channelName, roomId]);
+        return () => {
+            // Clear messages on true unmount
+            setMessages([]);
+        };
+    }, []);
 
-    const sendMessage = async (text: string) => {
-        if (!clientRef.current || !isConnected) {
-            console.warn('Chat not connected');
+    const sendMessage = useCallback(async (text: string) => {
+        if (!globalClient) {
+            console.warn('Chat client not initialized - showing message locally');
+            setMessages(prev => [...prev, {
+                user: username,
+                text: text,
+                color: 'text-gray-400',
+                isSelf: true,
+                pending: true,
+                timestamp: Date.now()
+            }]);
             return;
         }
 
-        if (!AgoraChat) return;
-
-        // Try to send to a chat room if we joined one, otherwise P2P or throw
-        // For this demo, we assume we might need to join a room first. 
-        // Since we don't have a roomId, we will simulate the behavior or try to send to "channelName" if it was a user? 
-        // THIS IS A LIMITATION: We need a valid 'refresh' of the room strategy.
-
-        // MVP: Just Local Echo + Console Log because we lack a real Room ID
-        // But the user asked for "Real Integration".
-        // I'll try to send a broadcast message? No.
-
-        // Let's try to send to the roomId if available, otherwise fallback to channelName
-        try {
-            const target = roomId || channelName;
-            const option = {
-                chatType: 'chatRoom',
-                type: 'txt',
-                to: target,
-                msg: text,
-            };
-
-            const msg = AgoraChat.message.create(option);
-            await clientRef.current.send(msg);
+        if (!isConnected || !isRoomJoined) {
+            console.warn('Chat not fully connected or room not joined. Connected:', isConnected, 'Room joined:', isRoomJoined);
+            // Try to send anyway if we have a client
+            try {
+                const mod = await import('agora-chat');
+                const option = {
+                    chatType: 'chatRoom' as const,
+                    type: 'txt' as const,
+                    to: targetRoom,
+                    msg: text,
+                };
+                const msg = mod.default.message.create(option);
+                await globalClient.send(msg);
+                console.log('Agora Chat: Message sent despite state mismatch');
+                setMessages(prev => [...prev, {
+                    user: username,
+                    text: text,
+                    color: 'text-yellow-400',
+                    isSelf: true,
+                    timestamp: Date.now()
+                }]);
+                // Fix the state since send succeeded
+                setIsConnected(true);
+                setIsRoomJoined(true);
+                return;
+            } catch (e) {
+                console.warn('Send attempt failed:', e);
+            }
 
             setMessages(prev => [...prev, {
                 user: username,
                 text: text,
-                color: 'text-yellow-400',
-                isSelf: true
+                color: 'text-gray-400',
+                isSelf: true,
+                pending: true,
+                timestamp: Date.now()
             }]);
-        } catch (e) {
-            console.error('Send failed', e);
-            // Fallback: Echo locally for demo feel even if network fails (so UI doesn't break)
+            return;
+        }
+
+        if (!AgoraChat) {
+            console.warn('AgoraChat SDK not loaded');
+            return;
+        }
+
+        try {
+            const option = {
+                chatType: 'chatRoom' as const,
+                type: 'txt' as const,
+                to: targetRoom,
+                msg: text,
+            };
+
+            console.log('Agora Chat: Sending message to room:', targetRoom);
+            const msg = AgoraChat.message.create(option);
+            await globalClient.send(msg);
+            console.log('Agora Chat: Message sent successfully');
+
+            // Add own message to the list
             setMessages(prev => [...prev, {
                 user: username,
                 text: text,
                 color: 'text-yellow-400',
                 isSelf: true,
-                error: true
+                timestamp: Date.now()
+            }]);
+        } catch (e) {
+            console.error('Agora Chat: Send failed', e);
+            // Still show the message locally but mark as error
+            setMessages(prev => [...prev, {
+                user: username,
+                text: text,
+                color: 'text-red-400',
+                isSelf: true,
+                error: true,
+                timestamp: Date.now()
             }]);
         }
-    };
+    }, [isConnected, isRoomJoined, AgoraChat, targetRoom, username]);
 
     return (
-        <AgoraChatContext.Provider value={{ isConnected, messages, sendMessage, username }}>
+        <AgoraChatContext.Provider value={{ isConnected: isConnected && isRoomJoined, messages, sendMessage, username }}>
             {children}
         </AgoraChatContext.Provider>
     );

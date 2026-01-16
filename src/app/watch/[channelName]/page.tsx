@@ -38,6 +38,13 @@ function WatchPageContent({ channelName }: { channelName: string }) {
     const platform = searchParams.get('platform');
     const isYoutube = platform === 'youtube';
 
+    // Broadcast settings from green room (for hosts)
+    const broadcastQuality = searchParams.get('quality') || '720p_2';
+    const broadcastMicOn = searchParams.get('micOn') !== 'false';
+    const broadcastCameraOn = searchParams.get('cameraOn') !== 'false';
+    const broadcastCameraId = searchParams.get('cameraId') || undefined;
+    const broadcastMicId = searchParams.get('micId') || undefined;
+
     // State for Tokens (Agora RTC + Chat)
     const [tokenData, setTokenData] = useState<{
         token: string;
@@ -223,6 +230,11 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                                 token={tokenData.token}
                                 uid={tokenData.uid}
                                 onLeave={() => router.push('/')}
+                                initialQuality={broadcastQuality}
+                                initialMicOn={broadcastMicOn}
+                                initialCameraOn={broadcastCameraOn}
+                                cameraDeviceId={broadcastCameraId}
+                                micDeviceId={broadcastMicId}
                             />
                         ) : (
                             <ViewerView

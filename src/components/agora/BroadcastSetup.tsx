@@ -1,27 +1,130 @@
 'use client';
 
 import { useLocalMicrophoneTrack, useLocalCameraTrack, LocalUser } from 'agora-rtc-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import AgoraRTC from 'agora-rtc-sdk-ng';
 
 interface BroadcastSetupProps {
-    onReady: (channelName: string) => void;
+    onReady: (channelName: string, settings: BroadcastSettings) => void;
 }
+
+export interface BroadcastSettings {
+    quality: string;
+    cameraDeviceId?: string;
+    micDeviceId?: string;
+    micOn: boolean;
+    cameraOn: boolean;
+}
+
+interface MediaDevice {
+    deviceId: string;
+    label: string;
+}
+
+const QUALITY_OPTIONS = [
+    { value: '480p_1', label: '480p SD', description: 'Best for slow connections' },
+    { value: '720p_2', label: '720p HD', description: 'Balanced quality' },
+    { value: '1080p_1', label: '1080p FHD', description: 'Best quality' },
+];
 
 export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
     const [channelName, setChannelName] = useState('');
     const [micOn, setMicOn] = useState(true);
     const [cameraOn, setCameraOn] = useState(true);
+    const [quality, setQuality] = useState('720p_2');
+    const [showSettings, setShowSettings] = useState(false);
 
-    // Create local tracks for preview
-    const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn);
-    const { localCameraTrack } = useLocalCameraTrack(cameraOn);
+    // Device lists
+    const [cameras, setCameras] = useState<MediaDevice[]>([]);
+    const [microphones, setMicrophones] = useState<MediaDevice[]>([]);
+    const [selectedCamera, setSelectedCamera] = useState<string>('');
+    const [selectedMic, setSelectedMic] = useState<string>('');
+
+    // Fetch available devices
+    useEffect(() => {
+        const getDevices = async () => {
+            try {
+                // Request permissions first
+                await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+
+                const devices = await AgoraRTC.getDevices();
+
+                const videoDevices = devices
+                    .filter(d => d.kind === 'videoinput')
+                    .map(d => ({ deviceId: d.deviceId, label: d.label || `Camera ${d.deviceId.slice(0, 8)}` }));
+
+                const audioDevices = devices
+                    .filter(d => d.kind === 'audioinput')
+                    .map(d => ({ deviceId: d.deviceId, label: d.label || `Microphone ${d.deviceId.slice(0, 8)}` }));
+
+                setCameras(videoDevices);
+                setMicrophones(audioDevices);
+
+                // Set defaults
+                if (videoDevices.length > 0 && !selectedCamera) {
+                    setSelectedCamera(videoDevices[0].deviceId);
+                }
+                if (audioDevices.length > 0 && !selectedMic) {
+                    setSelectedMic(audioDevices[0].deviceId);
+                }
+            } catch (err) {
+                console.error('Error getting devices:', err);
+            }
+        };
+
+        getDevices();
+
+        // Listen for device changes
+        navigator.mediaDevices.addEventListener('devicechange', getDevices);
+        return () => {
+            navigator.mediaDevices.removeEventListener('devicechange', getDevices);
+        };
+    }, []);
+
+    // Create local tracks for preview with selected devices
+    const { localMicrophoneTrack } = useLocalMicrophoneTrack(micOn, {
+        microphoneId: selectedMic || undefined
+    });
+    const { localCameraTrack } = useLocalCameraTrack(cameraOn, {
+        cameraId: selectedCamera || undefined,
+        encoderConfig: quality as any
+    });
+
+    // Update camera when selection changes
+    useEffect(() => {
+        if (localCameraTrack && selectedCamera) {
+            localCameraTrack.setDevice(selectedCamera).catch(console.error);
+        }
+    }, [selectedCamera, localCameraTrack]);
+
+    // Update microphone when selection changes
+    useEffect(() => {
+        if (localMicrophoneTrack && selectedMic) {
+            localMicrophoneTrack.setDevice(selectedMic).catch(console.error);
+        }
+    }, [selectedMic, localMicrophoneTrack]);
+
+    // Update quality when changed
+    useEffect(() => {
+        if (localCameraTrack) {
+            localCameraTrack.setEncoderConfiguration(quality as any).catch(console.error);
+        }
+    }, [quality, localCameraTrack]);
 
     const handleStart = () => {
         if (channelName.trim()) {
-            onReady(channelName);
+            onReady(channelName, {
+                quality,
+                cameraDeviceId: selectedCamera,
+                micDeviceId: selectedMic,
+                micOn,
+                cameraOn
+            });
         }
     };
+
+    const currentQuality = QUALITY_OPTIONS.find(q => q.value === quality) || QUALITY_OPTIONS[1];
 
     return (
         <div className="min-h-screen bg-black flex flex-col items-center justify-center p-6 relative">
@@ -34,7 +137,7 @@ export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
                 <span>Back</span>
             </Link>
 
-            <div className="w-full max-w-4xl grid md:grid-cols-2 gap-12 items-center">
+            <div className="w-full max-w-4xl grid md:grid-cols-2 gap-12 items-start">
 
                 {/* Left: Preview */}
                 <div className="space-y-6">
@@ -48,6 +151,12 @@ export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
                             style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                             className="w-full h-full object-cover"
                         >
+                            {/* Quality Badge */}
+                            <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full z-10">
+                                <span className="text-yellow-400 text-xs font-bold">{currentQuality.label}</span>
+                            </div>
+
+                            {/* Status Badge */}
                             <div className="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-full flex items-center gap-2 z-10">
                                 <div className={`w-2 h-2 rounded-full ${micOn ? 'bg-green-500' : 'bg-red-500'}`}></div>
                                 <span className="text-white text-xs font-semibold tracking-wide">
@@ -56,7 +165,7 @@ export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
                             </div>
                         </LocalUser>
 
-                        {/* Overlay Settings - Positioned safely */}
+                        {/* Overlay Controls */}
                         <div className="absolute bottom-4 right-4 flex gap-3 z-20">
                             <button
                                 onClick={() => setMicOn(!micOn)}
@@ -87,26 +196,101 @@ export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
                     </div>
                 </div>
 
-                {/* Right: Details */}
-                <div className="space-y-8">
+                {/* Right: Details & Settings */}
+                <div className="space-y-6">
                     <div>
                         <h1 className="text-4xl font-black text-white mb-2 tracking-tight">Stream Setup</h1>
                         <p className="text-gray-400">Get everything ready for your broadcast.</p>
                     </div>
 
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Channel Title</label>
-                            <input
-                                type="text"
-                                value={channelName}
-                                onChange={(e) => setChannelName(e.target.value)}
-                                placeholder="What are we doing today?"
-                                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-purple-500 focus:ring-1 focus:ring-purple-500 transition-all font-medium"
-                            />
+                    {/* Channel Name */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Channel Title</label>
+                        <input
+                            type="text"
+                            value={channelName}
+                            onChange={(e) => setChannelName(e.target.value)}
+                            placeholder="What are we doing today?"
+                            className="w-full bg-gray-900 border border-gray-800 rounded-xl px-5 py-4 text-white placeholder-gray-600 focus:outline-none focus:border-yellow-500 focus:ring-1 focus:ring-yellow-500 transition-all font-medium"
+                        />
+                    </div>
+
+                    {/* Quality Selector */}
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Stream Quality</label>
+                        <div className="grid grid-cols-3 gap-2">
+                            {QUALITY_OPTIONS.map((option) => (
+                                <button
+                                    key={option.value}
+                                    onClick={() => setQuality(option.value)}
+                                    className={`p-3 rounded-xl border transition-all text-center ${quality === option.value
+                                            ? 'bg-yellow-600/20 border-yellow-500 text-yellow-400'
+                                            : 'bg-gray-900 border-gray-800 text-gray-400 hover:border-gray-700'
+                                        }`}
+                                >
+                                    <div className="font-bold text-sm">{option.label}</div>
+                                    <div className="text-[10px] opacity-70 mt-0.5">{option.description}</div>
+                                </button>
+                            ))}
                         </div>
                     </div>
 
+                    {/* Device Selectors */}
+                    <div className="space-y-4">
+                        {/* Camera Selector */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                <span className="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                                    Camera
+                                </span>
+                            </label>
+                            <select
+                                value={selectedCamera}
+                                onChange={(e) => setSelectedCamera(e.target.value)}
+                                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500 transition-all appearance-none cursor-pointer"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239CA3AF'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '20px' }}
+                            >
+                                {cameras.length === 0 ? (
+                                    <option value="">No cameras found</option>
+                                ) : (
+                                    cameras.map((camera) => (
+                                        <option key={camera.deviceId} value={camera.deviceId}>
+                                            {camera.label}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+
+                        {/* Microphone Selector */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">
+                                <span className="flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                                    Microphone
+                                </span>
+                            </label>
+                            <select
+                                value={selectedMic}
+                                onChange={(e) => setSelectedMic(e.target.value)}
+                                className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500 transition-all appearance-none cursor-pointer"
+                                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%239CA3AF'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19 9l-7 7-7-7'%3E%3C/path%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '20px' }}
+                            >
+                                {microphones.length === 0 ? (
+                                    <option value="">No microphones found</option>
+                                ) : (
+                                    microphones.map((mic) => (
+                                        <option key={mic.deviceId} value={mic.deviceId}>
+                                            {mic.label}
+                                        </option>
+                                    ))
+                                )}
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Start Button */}
                     <button
                         onClick={handleStart}
                         disabled={!channelName.trim()}
@@ -115,17 +299,6 @@ export function BroadcastSetup({ onReady }: BroadcastSetupProps) {
                         <span>Start Broadcast</span>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" /></svg>
                     </button>
-
-                    <div className="grid grid-cols-2 gap-4 pt-4 border-t border-gray-900">
-                        <button className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-900/50 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white text-sm font-medium transition-colors border border-gray-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                            Settings
-                        </button>
-                        <button className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-900/50 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white text-sm font-medium transition-colors border border-gray-800">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
-                            RTMP Keys
-                        </button>
-                    </div>
                 </div>
             </div>
         </div>
