@@ -158,8 +158,8 @@ function WatchPageContent({ channelName }: { channelName: string }) {
         // 1. YouTube View
         if (isYoutube) {
             return (
-                <div className="relative w-full h-full flex items-center justify-center bg-black">
-                    <div className="w-full aspect-video max-h-full relative">
+                <div className="relative w-full h-auto md:h-full md:flex md:items-center md:justify-center bg-black">
+                    <div className="w-full aspect-video md:max-h-full relative">
                         {!isLoaded && (
                             <div className="absolute inset-0 flex items-center justify-center bg-black z-10">
                                 <div className="text-center">
@@ -213,8 +213,8 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
         // 3. Agora Views
         return (
-            <div className="relative w-full h-full flex items-center justify-center bg-black">
-                <div className="w-full h-full relative">
+            <div className="relative w-full h-auto md:h-full md:flex md:items-center md:justify-center bg-black">
+                <div className="w-full aspect-video md:max-h-full md:h-full relative">
                     <AgoraProvider role={isHost ? 'host' : 'audience'}>
                         {isHost ? (
                             <BroadcasterView
@@ -359,7 +359,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
             `}</style>
 
             {/* MAIN CONTENT AREA: Video */}
-            <div className="w-full md:w-3/4 h-auto md:h-full bg-gray-950 flex flex-col overflow-hidden shrink-0">
+            <div className="w-full md:w-3/4 md:h-full bg-gray-950 flex flex-col overflow-hidden shrink-0">
 
                 {/* Desktop Top Nav (Hidden on Mobile) */}
                 {!isHost && (
@@ -383,7 +383,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
                 {/* VIDEO FEED */}
                 <div
-                    className="h-[40vh] md:flex-1 min-h-0 relative bg-black flex items-center justify-center overflow-hidden mobile-landscape-fullscreen touch-none shrink-0"
+                    className="w-full md:flex-1 min-h-0 relative bg-black overflow-hidden mobile-landscape-fullscreen touch-none shrink-0"
                     style={{ touchAction: 'none' }}
                 >
                     {renderVideoContent()}
