@@ -1,0 +1,104 @@
+@import "tailwindcss";
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+
+  /* Dragon Live Gambling Theme */
+  --gold: #d4af37;
+  --gold-light: #f4d03f;
+  --gold-dark: #b8860b;
+  --crimson: #dc143c;
+  --crimson-dark: #8b0000;
+  --jade: #00a86b;
+  --jade-dark: #006b3c;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-gold: #d4af37;
+  --color-gold-light: #f4d03f;
+  --color-gold-dark: #b8860b;
+  --color-crimson: #dc143c;
+  --color-jade: #00a86b;
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Gambling Theme Utilities - using !important to override Tailwind defaults */
+.gradient-gold {
+  background: linear-gradient(135deg, #b8860b 0%, #d4af37 50%, #f4d03f 100%) !important;
+  color: #000 !important;
+}
+
+.gradient-crimson {
+  background: linear-gradient(135deg, #8b0000 0%, #dc143c 100%) !important;
+}
+
+.text-gold {
+  color: #d4af37 !important;
+}
+
+.text-gold-light {
+  color: #f4d03f !important;
+}
+
+.border-gold {
+  border-color: #d4af37 !important;
+}
+
+.bg-gold {
+  background-color: #d4af37 !important;
+}
+
+.hover\:text-gold:hover {
+  color: #d4af37 !important;
+}
+
+.hover\:border-gold:hover {
+  border-color: #d4af37 !important;
+}
+
+/* Gold opacity variants */
+.text-gold\/60 {
+  color: rgba(212, 175, 55, 0.6) !important;
+}
+
+.text-gold\/50 {
+  color: rgba(212, 175, 55, 0.5) !important;
+}
+
+.border-gold\/20 {
+  border-color: rgba(212, 175, 55, 0.2) !important;
+}
+
+.border-gold\/30 {
+  border-color: rgba(212, 175, 55, 0.3) !important;
+}
+
+.border-gold\/10 {
+  border-color: rgba(212, 175, 55, 0.1) !important;
+}
+
+.from-gold {
+  --tw-gradient-from: #d4af37 !important;
+}
+
+.to-gold {
+  --tw-gradient-to: #d4af37 !important;
+}
+
+.via-gold-light {
+  --tw-gradient-via: #f4d03f !important;
+}
+
+.from-gold-dark {
+  --tw-gradient-from: #b8860b !important;
+}
