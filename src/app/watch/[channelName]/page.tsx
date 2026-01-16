@@ -400,7 +400,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
                 {/* Desktop Related Section (Hidden on Mobile) */}
                 {!isHost && (
-                    <div className="hidden md:block h-36 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-4 overflow-hidden z-20 relative">
+                    <div className="hidden md:block h-48 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-4 overflow-hidden z-20 relative">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
                             <span className="h-px flex-1 bg-yellow-600/20"></span>
