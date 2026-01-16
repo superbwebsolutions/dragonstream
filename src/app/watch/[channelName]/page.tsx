@@ -305,7 +305,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                             value={inputValue}
                             onChange={(e) => setInputValue(e.target.value)}
                             placeholder="Type a message..."
-                            className="flex-1 bg-gray-800 border border-yellow-600/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-[16px] md:text-sm"
+                            className="flex-1 bg-gray-800 border border-yellow-600/30 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-yellow-500 transition-colors text-[16px] lg:text-sm"
                         />
                         <button
                             type="submit"
@@ -341,9 +341,9 @@ function WatchPageContent({ channelName }: { channelName: string }) {
     );
 
     return (
-        <div className="fixed inset-0 z-50 bg-black flex flex-col md:flex-row overflow-hidden select-none">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col lg:flex-row overflow-hidden select-none">
             <style jsx global>{`
-                @media (max-width: 768px) {
+                @media (max-width: 1023px) {
                     html, body {
                         overflow: hidden !important;
                         height: 100% !important;
@@ -351,7 +351,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                         width: 100% !important;
                     }
                 }
-                @media (max-width: 768px) and (orientation: landscape) {
+                @media (max-width: 1023px) and (orientation: landscape) {
                     .mobile-landscape-fullscreen {
                         position: fixed !important;
                         top: 0;
@@ -371,11 +371,11 @@ function WatchPageContent({ channelName }: { channelName: string }) {
             `}</style>
 
             {/* MAIN CONTENT AREA: Video */}
-            <div className="w-full md:w-3/4 md:h-full bg-gray-950 flex flex-col overflow-hidden shrink-0">
+            <div className="w-full lg:w-3/4 lg:h-full bg-gray-950 flex flex-col overflow-hidden shrink-0">
 
                 {/* Desktop Top Nav (Hidden on Mobile) */}
                 {!isHost && (
-                    <div className="hidden md:flex h-16 items-center justify-between px-4 bg-gray-900 border-b border-yellow-600/20 shrink-0 z-20 relative">
+                    <div className="hidden lg:flex h-16 items-center justify-between px-4 bg-gray-900 border-b border-yellow-600/20 shrink-0 z-20 relative">
                         <a href="/" className="flex items-center gap-2 text-gray-400 hover:text-white transition-colors group">
                             <div className="p-1.5 rounded-full bg-gray-800 group-hover:bg-gray-700 transition-colors">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -395,7 +395,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
                 {/* VIDEO FEED */}
                 <div
-                    className="w-full md:flex-1 min-h-0 relative bg-black overflow-hidden mobile-landscape-fullscreen touch-none shrink-0"
+                    className="w-full lg:flex-1 min-h-0 relative bg-black overflow-hidden mobile-landscape-fullscreen touch-none shrink-0"
                     style={{ touchAction: 'none' }}
                 >
                     {renderVideoContent()}
@@ -403,7 +403,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
                 {/* Mobile Navigation Buttons */}
                 {!isHost && (
-                    <div className="flex md:hidden items-center justify-between px-3 py-2 bg-gray-900 border-t border-yellow-600/20 shrink-0 z-20 mobile-landscape-hidden">
+                    <div className="flex lg:hidden items-center justify-between px-3 py-2 bg-gray-900 border-t border-yellow-600/20 shrink-0 z-20 mobile-landscape-hidden">
                         <a href="/" className="flex items-center gap-1.5 text-gray-400 text-[11px] font-bold uppercase tracking-tight">
                             <div className="p-1.5 rounded-full bg-gray-800">
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -428,7 +428,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
 
                 {/* Desktop Related Section (Hidden on Mobile) */}
                 {!isHost && (
-                    <div className="hidden md:block h-48 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-4 overflow-hidden z-20 relative">
+                    <div className="hidden lg:block h-48 bg-gray-900 border-t border-yellow-600/20 shrink-0 p-4 overflow-hidden z-20 relative">
                         <div className="flex items-center gap-2 mb-2">
                             <span className="text-xs font-bold text-yellow-500 uppercase tracking-wide">Related Tables</span>
                             <span className="h-px flex-1 bg-yellow-600/20"></span>
@@ -448,10 +448,10 @@ function WatchPageContent({ channelName }: { channelName: string }) {
             </div>
 
             {/* MOBILE: Tabbed Chat/Related Area */}
-            <div className="flex-1 md:w-1/4 md:h-full flex flex-col border-t md:border-t-0 md:border-l border-yellow-600/20 bg-gray-950 overflow-hidden min-h-0">
+            <div className="flex-1 lg:w-1/4 lg:h-full flex flex-col border-t lg:border-t-0 lg:border-l border-yellow-600/20 bg-gray-950 overflow-hidden min-h-0">
 
                 {/* Mobile Tabs (Hidden on Desktop) */}
-                <div className="flex md:hidden border-b border-yellow-600/20 shrink-0">
+                <div className="flex lg:hidden border-b border-yellow-600/20 shrink-0">
                     <button
                         onClick={() => setMobileTab('chat')}
                         className={`flex-1 py-3 text-xs font-bold uppercase tracking-wide transition-colors ${mobileTab === 'chat' ? 'text-yellow-500 border-b-2 border-yellow-500 bg-gray-900' : 'text-gray-500'}`}
@@ -472,11 +472,11 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     {isYoutube ? (
                         <>
                             {/* Desktop */}
-                            <div className="hidden md:flex h-full flex-col">
+                            <div className="hidden lg:flex h-full flex-col">
                                 <MockChatPanel />
                             </div>
                             {/* Mobile */}
-                            <div className="md:hidden flex h-full flex-col">
+                            <div className="lg:hidden flex h-full flex-col">
                                 {mobileTab === 'chat' ? (
                                     <MockChatPanel />
                                 ) : (
@@ -506,12 +506,12 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                                 roomId={tokenData.roomId}
                             >
                                 {/* Desktop: Always Chat */}
-                                <div className="hidden md:flex h-full flex-col">
+                                <div className="hidden lg:flex h-full flex-col">
                                     <ChatPanel channelName={decodeURIComponent(title)} />
                                 </div>
 
                                 {/* Mobile: Chat OR Related */}
-                                <div className="md:hidden flex h-full flex-col">
+                                <div className="lg:hidden flex h-full flex-col">
                                     {mobileTab === 'chat' ? (
                                         <ChatPanel channelName={decodeURIComponent(title)} />
                                     ) : (
