@@ -138,6 +138,22 @@ function WatchPageContent({ channelName }: { channelName: string }) {
     // ==========================================
     // RENDER HELPER: Video Content
     // ==========================================
+    // Function to unmute YouTube video via IFrame Player API
+    const handleUnmute = () => {
+        if (iframeRef.current && iframeRef.current.contentWindow) {
+            // Send postMessage commands to YouTube player
+            iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+                '*'
+            );
+            iframeRef.current.contentWindow.postMessage(
+                JSON.stringify({ event: 'command', func: 'playVideo', args: [] }),
+                '*'
+            );
+            setIsMuted(false);
+        }
+    };
+
     const renderVideoContent = () => {
         // 1. YouTube View
         if (isYoutube) {
@@ -154,7 +170,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                         )}
                         <iframe
                             ref={iframeRef}
-                            src={`https://www.youtube.com/embed/${channelName}?autoplay=1&mute=${isMuted ? 1 : 0}&loop=1&playlist=${channelName}&controls=1&rel=0&modestbranding=1&enablejsapi=1`}
+                            src={`https://www.youtube.com/embed/${channelName}?autoplay=1&mute=1&loop=1&playlist=${channelName}&controls=1&rel=0&modestbranding=1&enablejsapi=1&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                             className="absolute inset-0 w-full h-full"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             allowFullScreen
@@ -164,7 +180,7 @@ function WatchPageContent({ channelName }: { channelName: string }) {
                     {/* Unmute Button Overlay */}
                     {isMuted && isLoaded && (
                         <button
-                            onClick={() => setIsMuted(false)}
+                            onClick={handleUnmute}
                             className="absolute bottom-4 left-4 z-30 bg-black/70 hover:bg-black/90 text-white px-4 py-2 rounded-full flex items-center gap-2 text-sm font-bold transition-all border border-white/20"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
